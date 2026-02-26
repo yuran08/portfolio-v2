@@ -7,6 +7,10 @@ type PostTocProps = {
   items: BlogTocItem[];
 };
 
+// Keep active heading stable with sticky header offset and early section switching.
+const TOC_OBSERVER_ROOT_MARGIN = "-96px 0px -65% 0px";
+const TOC_OBSERVER_THRESHOLD = [0, 1];
+
 function getHashId() {
   const hash = window.location.hash.slice(1);
 
@@ -153,8 +157,8 @@ export function PostToc({ items }: PostTocProps) {
         scheduleUpdate();
       },
       {
-        rootMargin: "-96px 0px -65% 0px",
-        threshold: [0, 1],
+        rootMargin: TOC_OBSERVER_ROOT_MARGIN,
+        threshold: TOC_OBSERVER_THRESHOLD,
       },
     );
 

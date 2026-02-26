@@ -1,6 +1,8 @@
 import { draftMode } from "next/headers";
 import { redirect } from "next/navigation";
+import { parseDraftSecretEnv } from "@/lib/env";
 import { getBlogPostBySlug, isValidBlogSlug } from "@/lib/blog";
+import { safeEqual } from "@/lib/security";
 
 function parseBlogSlug(rawSlug: string) {
   const trimmed = rawSlug.trim();
@@ -29,7 +31,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get("secret");
   const rawSlug = searchParams.get("slug");
-  const configuredSecret = process.env.BLOG_DRAFT_SECRET;
+  const configuredSecret = parseDraftSecretEnv().BLOG_DRAFT_SECRET;
 
   if (!configuredSecret) {
     return new Response("Draft secret is not configured", { status: 500 });
@@ -37,7 +39,7 @@ export async function GET(request: Request) {
 
   const slug = rawSlug ? parseBlogSlug(rawSlug) : null;
 
-  if (secret !== configuredSecret || !slug) {
+  if (!safeEqual(secret, configuredSecret) || !slug) {
     return new Response("Invalid token or slug", { status: 401 });
   }
 

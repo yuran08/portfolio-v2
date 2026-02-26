@@ -2,6 +2,7 @@ import { getAllBlogPosts } from "@/lib/blog";
 import { buildRssXml } from "@/lib/rss";
 import { toAbsoluteUrl } from "@/lib/site";
 
+// Route segment config must use a statically analyzable literal.
 export const revalidate = 3600;
 
 export async function GET() {

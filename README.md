@@ -65,3 +65,10 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 `BLOG_REVALIDATE_SECRET` 未设置时，会回退使用 `BLOG_DRAFT_SECRET`。
+
+`BLOG_DRAFT_SECRET` 与 `BLOG_REVALIDATE_SECRET`（若设置）建议至少 16 个字符，服务端会进行格式校验。
+
+## 草稿模式接口
+
+- 启用草稿：`/api/draft?secret=<BLOG_DRAFT_SECRET>&slug=/blog/<slug>`
+- 关闭草稿：`/api/draft/disable?secret=<BLOG_DRAFT_SECRET>`

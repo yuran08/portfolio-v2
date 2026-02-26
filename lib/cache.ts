@@ -1,0 +1,1 @@
+export const BLOG_REVALIDATE_SECONDS = 60 * 60;

@@ -84,7 +84,7 @@ export default async function BlogPostPage({ params }: Props) {
     mainEntityOfPage: canonicalUrl,
     url: canonicalUrl,
     keywords: post.tags.join(", "),
-    inLanguage: "zh-CN",
+    inLanguage: "en",
   };
 
   return (

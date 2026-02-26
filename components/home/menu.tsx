@@ -6,22 +6,28 @@ import { menuLinks } from "./menu-links";
 import { useSelectPage } from "./use-select-page";
 
 export default function Menu() {
+  const currentPage = useSelectPage();
+
   return (
     <nav className="fixed right-4 bottom-4 flex flex-col gap-1.5 text-center sm:right-6 sm:bottom-6 sm:gap-2 lg:right-8 lg:bottom-8">
       {menuLinks.map((link) => (
-        <MenuLink key={link.href} link={link} />
+        <MenuLink key={link.href} link={link} currentPage={currentPage} />
       ))}
     </nav>
   );
 }
 
-const MenuLink = ({ link }: { link: { href: string; label: string } }) => {
-  const currentPage = useSelectPage();
-
+const MenuLink = ({
+  link,
+  currentPage,
+}: {
+  link: { href: string; label: string };
+  currentPage: string;
+}) => {
   if (currentPage === link.label) return null;
 
   return (
-    <ViewTransition key={`menu-${link.label}`} name={link.label}>
+    <ViewTransition name={link.label}>
       <Link
         href={link.href}
         className="group relative block overflow-hidden px-2 py-1 text-base font-bold uppercase focus:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring sm:text-lg lg:text-xl"

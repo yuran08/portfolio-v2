@@ -39,11 +39,3 @@ export const LineItemSubheading = ({
     </p>
   );
 };
-
-export const LineItemDescription = ({
-  children,
-}: {
-  children: React.ReactNode;
-}) => {
-  return <p className="mt-3 text-sm text-balance sm:text-base">{children}</p>;
-};

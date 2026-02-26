@@ -8,6 +8,7 @@ export type BlogReadingMetrics = {
   readingMinutes: number;
 };
 
+// Project reading-time baseline: 300 non-whitespace characters per minute.
 const CHARS_PER_MINUTE = 300;
 
 function normalizeWhitespace(text: string) {

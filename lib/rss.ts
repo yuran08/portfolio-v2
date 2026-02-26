@@ -3,7 +3,7 @@ import type { BlogPostSummary } from "@/lib/blog";
 export const RSS_SITE_TITLE = "Yuran Blog";
 export const RSS_SITE_DESCRIPTION =
   "Personal blog about Next.js, frontend engineering, and product building.";
-export const RSS_LANGUAGE = "zh-CN";
+export const RSS_LANGUAGE = "en";
 
 type BuildRssXmlOptions = {
   posts: BlogPostSummary[];

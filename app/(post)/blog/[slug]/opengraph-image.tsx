@@ -15,9 +15,10 @@ type Props = {
 export default async function Image({ params }: Props) {
   const { slug } = await params;
   const post = await getBlogPostBySlug(slug);
-  const title = post?.title ?? "Yuran Blog";
-  const excerpt =
-    post?.excerpt ?? "Personal blog about Next.js, frontend engineering, and product building.";
+
+  if (!post) {
+    return new Response("Not found", { status: 404 });
+  }
 
   return new ImageResponse(
     (
@@ -63,7 +64,7 @@ export default async function Image({ params }: Props) {
               letterSpacing: "-0.03em",
             }}
           >
-            {title}
+            {post.title}
           </div>
           <div
             style={{
@@ -72,7 +73,7 @@ export default async function Image({ params }: Props) {
               lineHeight: 1.4,
             }}
           >
-            {excerpt}
+            {post.excerpt}
           </div>
         </div>
       </div>

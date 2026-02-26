@@ -5,6 +5,8 @@ import {
   getBlogPostCacheTag,
   isValidBlogSlug,
 } from "@/lib/blog";
+import { parseDraftSecretEnv, parseRevalidateSecretEnv } from "@/lib/env";
+import { safeEqual } from "@/lib/security";
 
 type RevalidateScope = {
   paths: string[];
@@ -258,8 +260,9 @@ async function handleRevalidate(request: NextRequest) {
   }
 
   const { pathInput, secret, slugInput, tags, typeInput } = input;
+  const { BLOG_REVALIDATE_SECRET } = parseRevalidateSecretEnv();
   const configuredSecret =
-    process.env.BLOG_REVALIDATE_SECRET ?? process.env.BLOG_DRAFT_SECRET;
+    BLOG_REVALIDATE_SECRET ?? parseDraftSecretEnv().BLOG_DRAFT_SECRET;
 
   if (!configuredSecret) {
     return Response.json(
@@ -272,7 +275,7 @@ async function handleRevalidate(request: NextRequest) {
     );
   }
 
-  if (secret !== configuredSecret) {
+  if (!safeEqual(secret, configuredSecret)) {
     return Response.json({ ok: false, error: "Invalid secret" }, { status: 401 });
   }
 

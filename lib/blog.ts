@@ -7,8 +7,10 @@ import {
   type BlogReadingMetrics,
 } from "@/lib/blog-reading";
 import { extractTocFromMdx, type BlogTocItem } from "@/lib/blog-toc";
+import { BLOG_REVALIDATE_SECONDS } from "@/lib/cache";
 import { z } from "zod";
 
+// TODO(next16-cache): migrate unstable_cache to `use cache` with Cache Components.
 const blogMetadataSchema = z.object({
   title: z.string().min(1),
   excerpt: z.string().min(1),
@@ -28,7 +30,6 @@ const blogModuleSchema = z.object({
 
 const BLOG_DIR = path.join(process.cwd(), "content", "blog");
 const BLOG_FILE_EXT = ".mdx";
-const BLOG_CACHE_REVALIDATE_SECONDS = 60 * 60;
 
 export const BLOG_LIST_CACHE_TAG = "blog-list";
 const BLOG_POST_CACHE_TAG_PREFIX = "blog-post:";
@@ -116,7 +117,7 @@ const getAllBlogSlugsCached = unstable_cache(
   ["blog-slugs-v1"],
   {
     tags: [BLOG_LIST_CACHE_TAG],
-    revalidate: BLOG_CACHE_REVALIDATE_SECONDS,
+    revalidate: BLOG_REVALIDATE_SECONDS,
   },
 );
 
@@ -148,7 +149,7 @@ const getAllBlogPostsCached = unstable_cache(
   ["blog-post-summaries-v1"],
   {
     tags: [BLOG_LIST_CACHE_TAG],
-    revalidate: BLOG_CACHE_REVALIDATE_SECONDS,
+    revalidate: BLOG_REVALIDATE_SECONDS,
   },
 );
 
@@ -180,7 +181,7 @@ async function getBlogPostSummaryBySlug(slug: string) {
     ["blog-post-summary-v1", parsedSlug],
     {
       tags: [BLOG_LIST_CACHE_TAG, getBlogPostCacheTag(parsedSlug)],
-      revalidate: BLOG_CACHE_REVALIDATE_SECONDS,
+      revalidate: BLOG_REVALIDATE_SECONDS,
     },
   )();
 }
@@ -209,7 +210,7 @@ async function getBlogPostTocBySlug(slug: string) {
     ["blog-post-toc-v1", parsedSlug],
     {
       tags: [BLOG_LIST_CACHE_TAG, getBlogPostCacheTag(parsedSlug)],
-      revalidate: BLOG_CACHE_REVALIDATE_SECONDS,
+      revalidate: BLOG_REVALIDATE_SECONDS,
     },
   )();
 }
@@ -244,7 +245,7 @@ async function getBlogPostReadingBySlug(slug: string) {
     ["blog-post-reading-v1", parsedSlug],
     {
       tags: [BLOG_LIST_CACHE_TAG, getBlogPostCacheTag(parsedSlug)],
-      revalidate: BLOG_CACHE_REVALIDATE_SECONDS,
+      revalidate: BLOG_REVALIDATE_SECONDS,
     },
   )();
 }

@@ -33,5 +33,6 @@ describe("buildRssXml", () => {
       "<guid isPermaLink=\"true\">http://localhost:3000/blog/hello-world</guid>",
     );
     expect(xml).toContain("<lastBuildDate>Sun, 15 Feb 2026 00:00:00 GMT</lastBuildDate>");
+    expect(xml).toContain("<language>en</language>");
   });
 });
