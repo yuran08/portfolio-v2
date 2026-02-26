@@ -1,0 +1,223 @@
+export const metadata = {
+  title: "elpis-core 实现笔记（一）：内核启动与模块加载",
+  excerpt: "基于 Koa 拆解 elpis-core 内核实现，聚焦启动流程、自动加载机制与模块职责。",
+  publishedAt: "2026-02-24",
+  tags: ["node.js", "koa", "elpis-core", "后端架构"],
+};
+
+# 前言
+
+`elpis-core` 可以理解成一个基于 Koa 的后端骨架。它用“约定目录 + 自动加载”的方式，把 `config / service / controller / middleware / extend / router` 串起来，让你少写重复注册代码，更快把项目跑起来。
+
+<Note title="阅读提示">
+本文会按“入口装配 -> 模块职责 -> 场景边界”的顺序展开。建议先看目录再按需跳读到对应章节。
+</Note>
+
+<Warning>
+文中示例代码用于说明架构思路，实际工程请结合当前 Node.js 与依赖版本做安全性和可观测性补齐。
+</Warning>
+
+## 特性
+
+- **依赖不重**：以 Koa 为核心，配合 `koa-router`、`glob` 等少量依赖就能完成核心能力。
+- **上手快**：按约定目录组织代码，模块会自动加载，省去大量手写注册。
+- **结构清晰**：功能按模块拆开，各司其职，后续扩展不容易乱。
+
+## 核心功能
+
+### 启动入口：`start()` 负责什么
+
+先定一个边界：`index.js` 的 `start()` 本质是一个“装配器”，负责初始化运行时上下文，并按依赖顺序把各模块接起来；它本身不承载具体业务规则。  
+先看入口，再看模块职责，阅读成本会明显低很多。
+
+#### 启动入口代码（index.js）
+
+```javascript
+const koa = require('koa');
+const path = require('path');
+const env = require('./env');
+
+const configLoader = require('./loader/config');
+const routerSchemaLoader = require('./loader/router-schema');
+const serviceLoader = require('./loader/service');
+const controllerLoader = require('./loader/controller');
+const middlewareLoader = require('./loader/middleware');
+const extendLoader = require('./loader/extend');
+const routerLoader = require('./loader/router');
+
+module.exports = {
+  start: (options = {}) => {
+    const app = new koa();
+
+    app.options = options;
+    app.baseDir = process.cwd();
+    app.businessPath = path.resolve(app.baseDir, './app');
+    app.env = env();
+
+    configLoader(app);
+    routerSchemaLoader(app);
+    serviceLoader(app);
+    controllerLoader(app);
+    middlewareLoader(app);
+    extendLoader(app);
+
+    // 注册业务层全局中间件（app/middleware.js）
+    require(path.resolve(app.businessPath, './middleware.js'))(app);
+
+    // 注册路由
+    routerLoader(app);
+
+    const port = process.env.PORT || 8080;
+    const host = process.env.IP || '0.0.0.0';
+    app.listen(port, host);
+  },
+};
+```
+
+#### 启动流程（时序）
+
+1. 创建 Koa 实例
+2. 把基础上下文挂到 `app`（`options / baseDir / businessPath / env`）
+3. 按依赖顺序加载各功能模块
+4. 注册全局中间件（`app/middleware.js`）
+5. 注册路由并启动服务（默认 `PORT=8080`）
+
+#### 这个入口设计的价值
+
+- **定位清晰**：入口只做“装配”，业务逻辑收敛在 `service/controller`，后续维护时边界更明确。
+- **调试路径固定**：启动异常时优先看 `start()`，再按加载顺序排查，定位链路稳定。
+- **扩展点集中**：新增能力时优先在 loader 或 `extend` 补齐，不必到处改注册代码。
+
+### 功能模块
+
+#### 统一抽象：自动加载与装配机制
+
+先看各模块共用的一套“装配套路”，这样后面就不用反复说“挂载到 app”了：
+
+1. 约定目录：通过 `glob` 扫描固定目录（如 `app/service/**/*.js`）。
+2. 命名归一：文件名和目录名按 `kebab/snake -> camelCase` 规则转义。
+3. 形态适配：根据模块类型执行不同装配策略（对象合并、函数注册、类实例化）。
+4. 统一上下文：所有模块都接收同一个 `app` 运行时上下文，用于共享配置、环境、日志与容器能力。
+
+#### 加载顺序与依赖关系
+
+真实启动顺序如下：
+
+1. `config`
+2. `routerSchema`
+3. `service`
+4. `controller`
+5. `middleware`（仅加载到 `app.middlewares`）
+6. `extend`
+7. 全局中间件注册（执行 `app/middleware.js`）
+8. `router`（最终 `app.use(router.routes())`）
+
+这个顺序的价值主要在三点：
+
+- `service` 先于 `controller`，保证控制器编排时可以直接调用领域能力。
+- `routerSchema`、`router` 与中间件链配合，保证参数校验在业务处理前完成。
+- `extend` 先于全局中间件注册，确保 `app.logger` 一类基础设施能力可立即使用。
+
+下面按模块分别看“职责、价值、注意点”。
+
+#### 配置模块（config）
+
+`config` 本质上是在启动时准备一份可用配置，而不是处理业务逻辑。它先读 `config.default.js`，再叠加环境配置（`local/beta/production`），最终得到 `app.config`。  
+价值在于把环境差异收敛到配置层，业务代码里就不用到处写环境分支。  
+补充一点：当前实现用的是浅合并（`Object.assign`），嵌套对象会被整块覆盖，不会做递归合并。
+
+#### 路由规则模块（routerSchema）
+
+`routerSchema` 负责定义 API 契约（请求结构约束），它不做运行时分发。这里维护的是“路由模板 + HTTP 方法 -> JSON Schema”的映射。  
+价值是把接口参数规则集中管理，接口一致性和可维护性都会更好。  
+在动态路由场景中，请求会先由 `api-route-params` 预匹配写入 `ctx.$matchedRoute / ctx.$params`，再由 `api-params-verify` 依据模板执行 AJV 校验。
+
+#### 服务模块（service）
+
+`service` 是领域能力层，负责数据访问、外部接口调用和可复用业务逻辑沉淀。`controller` 只做编排，具体业务动作应该下沉到 `service`。  
+当前实现里，`service`（以及对应 `controller`）在启动阶段就实例化并复用。好处是依赖只初始化一次，请求阶段更轻，调用关系也更稳定。  
+注意实例属性应只保存稳定状态，不应写入请求级数据，否则在并发场景下容易出现状态串扰。
+
+#### 控制器模块（controller）
+
+`controller` 可以理解为 HTTP 适配层，负责把“请求输入”翻译成 `service` 调用，再把“service 输出”翻译成响应结构。  
+价值是隔离传输协议细节，让领域逻辑不直接耦合 HTTP。  
+边界应保持在“协议编排”，避免在控制器中沉淀复杂业务。
+
+#### 中间件模块（middleware）
+
+`middleware` 的核心职能是横切关注点治理：错误兜底、签名校验、参数预处理、请求校验。  
+这里要先区分两层：`loader/middleware` 只负责加载中间件定义，真正执行顺序由 `app/middleware.js` 的 `app.use(...)` 决定。  
+当前执行链路是“异常兜底 -> 签名校验 -> 路由参数预匹配 -> 参数 schema 校验”，任一环节都可以短路请求并直接返回错误。
+
+#### 扩展模块（extend）
+
+`extend` 用来注入通用基础设施能力，不直接承载业务流程。典型例子是 `logger`：本地环境走 `console`，非本地环境走 `log4js` 落盘。  
+价值是让日志、缓存、鉴权工具这类跨模块能力有统一入口。  
+当前实现将扩展直接挂到 `app` 根对象，并做同名冲突检测；调用链更短，但要注意命名治理，避免与既有 `app` 字段冲突。
+
+#### 路由模块（router）
+
+`router` 是流量入口编排层，负责把 URL + Method 映射到 `controller` 方法，并将 `koa-router` 能力接入 Koa。  
+价值是把“访问路径”和“业务处理”稳定解耦，后续演进接口会更从容。  
+当前项目还配置了 `GET *` 的 302 首页兜底策略，这属于业务策略选择，可按场景替换为 404 或 JSON 错误响应。
+
+### 最小可运行示例（承接前文）
+
+上面讲的是内核“怎么启动、按什么顺序装配”。下面这段代码对应的是“业务项目如何调用内核”。  
+也就是说，你调用的还是同一个 `start()`，它会执行前文提到的配置加载、模块注入与路由注册流程。
+
+在此之前，业务项目至少要满足这些约定：
+
+1. 目录存在 `app/`，并按约定放置 `service/controller/router` 等模块。
+2. 提供 `app/middleware.js`（即使是空实现也建议保留）。
+3. 配置层有可读取的默认配置（例如 `config.default.js`）。
+
+```javascript
+// 引入elpis-core
+const elpisCore = require('./elpis-core');
+
+// 启动项目
+elpisCore.start({
+  name: 'elpis',
+  homepage: '/',
+});
+```
+
+这段示例不是“另起一套机制”，只是把前面拆解过的启动链路真正跑起来。
+
+### 与主流框架对比：优缺点与使用场景
+
+为了避免“只讲实现、不讲定位”，这里补一段横向对比，帮助你判断是否要选 `elpis-core`。
+
+#### 横向对比（工程视角）
+
+- **Koa 原生**：约束低；起步成本低但后期治理成本高；适合小项目或完全自定义场景。
+- **Express**：约束低到中；工程化开销中等；适合生态驱动、历史项目改造。
+- **NestJS**：约束高；起步成本高但后期治理收益高；适合大团队、强规范、复杂领域。
+- **elpis-core**：约束中等；工程化开销中低；适合希望保留 Koa 灵活性并减少手写装配代码的团队。
+
+#### elpis-core 的优势（基于当前实现）
+
+- 约定目录 + 自动加载，能明显减少重复注册代码。
+- 启动顺序清晰，模块依赖关系可读性好，便于排错和 onboarding。
+- 依赖较轻，保留了 Koa 生态和中间件模型的灵活性。
+
+#### elpis-core 的短板与风险（基于当前实现）
+
+- 配置合并是浅合并（`Object.assign`），复杂配置容易被整段覆盖。
+- `service/controller` 启动期实例化并复用，若误放请求态数据会有并发串扰风险。
+- `extend` 直接挂 `app` 根对象，命名冲突需要团队规范约束。
+
+#### 建议使用场景
+
+- 追求“比 Koa 原生更有结构、比重框架更轻量”。
+- API 为主的 BFF/后台服务，需要快速迭代但又不想放弃分层约束。
+- 已有 Koa 积累，希望低迁移成本引入约定式工程结构。
+
+## 本章小结
+
+一句话总结：`elpis-core` 的核心思路是“约定化加载 + 清晰依赖顺序”。  
+这样做的好处是分层明确，配置、契约、编排、领域能力和横切逻辑各归其位，团队协作和后续扩展都会更顺。  
+如果把它放到主流框架坐标系里看，`elpis-core` 更像“轻量约定层”：在保留 Koa 灵活性的同时，把工程结构拉到可维护区间。  
+在完成 `elpis-core` 启动链路与模块分工梳理后，下一节将继续推进 `elpis` 前端工程化与基础设施搭建。

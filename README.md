@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# protfolio-v2
 
-## Getting Started
+基于 Next.js 16 的个人主页及作品集项目（Homepage + Blog + ...）。
 
-First, run the development server:
+## 快速开始
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开 `http://localhost:3000`。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 常用脚本
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm dev
+pnpm build
+pnpm start
+pnpm lint
+pnpm test
+pnpm test:run
+```
 
-## Learn More
+## 功能概览
 
-To learn more about Next.js, take a look at the following resources:
+- 博客列表与详情（`content/blog/*.mdx`）
+- 路由分组布局（列表与详情解耦）
+- SEO：metadata / sitemap / robots / JSON-LD / 动态 OG 图
+- RSS：`/rss.xml`
+- 草稿与再验证接口：`/api/draft`、`/api/draft/disable`、`/api/revalidate`
+- 本地托管字体（`next/font/local` + `app/fonts`）
+- 博客长文增强：TOC（`H2-H3`）/ 锚点高亮 / 滚动高亮 / 阅读时间+字数 / MDX 提示块
+- 测试：Vitest（RSS / TOC / 阅读指标）
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## MDX 写作约定
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- 目录生成规则：仅提取 `##` 与 `###` 进入右侧 TOC。
+- 标题锚点：`h2/h3` 自动注入锚点，可直接 `#hash` 跳转。
+- 提示块语法：
 
-## Deploy on Vercel
+```mdx
+<Note title="阅读提示">
+先看目录，再按需跳读。
+</Note>
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+<Warning>
+请注意线上环境的配置与权限控制。
+</Warning>
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 阅读指标口径
+
+- 仅统计正文可读文本（排除围栏代码块）。
+- `inline code` 计入字数。
+- 字数按“去空白后的字符数”统计。
+- 阅读时间按 `300 字/分钟` 估算，向上取整且最小为 `1` 分钟。
+
+## 环境变量
+
+```bash
+BLOG_DRAFT_SECRET=your_draft_secret
+BLOG_REVALIDATE_SECRET=your_revalidate_secret
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
+
+`BLOG_REVALIDATE_SECRET` 未设置时，会回退使用 `BLOG_DRAFT_SECRET`。
